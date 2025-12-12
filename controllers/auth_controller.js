@@ -58,13 +58,13 @@ export const googleLogin = async (req, res) => {
 
 export const updateLocation = async (req, res) => {
   console.log("lkkkkkk");
-  
+
   try {
-  
-     
+
+
     const { userId, location } = req.body;
-console.log(userId,"userid");
-console.log(location,"location");
+    console.log(userId, "userid");
+    console.log(location, "location");
 
 
     const user = await User.findByIdAndUpdate(
@@ -143,7 +143,7 @@ async function deleteFromB2(fileUrl) {
 
     const fileName = fileUrl.replace(`${CDN_URL}/`, '').split('?')[0];
     await ensureB2Authorized();
-    
+
     const fileList = await b2.listFileNames({
       bucketId: BUCKET_ID,
       maxFileCount: 1,
@@ -162,8 +162,8 @@ async function deleteFromB2(fileUrl) {
 
 async function processProfileImage(fileBuffer, timestamp) {
   const processedBuffer = await sharp(fileBuffer)
-    .resize({ 
-      width: 800, 
+    .resize({
+      width: 800,
       height: 800,
       fit: 'cover',
       position: 'center'
@@ -182,22 +182,22 @@ export const updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const { name, about, userRole } = req.body;
-    
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
     const updateData = {};
-    
+
     if (name && name.trim()) {
       updateData.name = name.trim();
     }
-    
+
     if (about !== undefined) {
       updateData.about = about.trim();
     }
-    
+
     if (userRole !== undefined) {
       updateData.userRole = userRole.trim();
     }
@@ -205,18 +205,18 @@ export const updateProfile = async (req, res) => {
     // Handle profile image upload
     if (req.file) {
       const file = req.file;
-      
+
       if (file.buffer && file.buffer.length > 0) {
         console.log(`📸 Processing profile image...`);
-        
+
         const timestamp = Date.now();
         const newImageUrl = await processProfileImage(file.buffer, timestamp);
-        
+
         // Delete old profile image if exists (not Google profile pics)
         if (user.picture && user.picture.includes(CDN_URL)) {
           await deleteFromB2(user.picture);
         }
-        
+
         updateData.picture = newImageUrl;
         console.log(`✅ Profile image uploaded: ${newImageUrl}`);
       }
@@ -248,9 +248,9 @@ export const updateProfile = async (req, res) => {
 export const getUserProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    
+
     const user = await User.findById(userId).select('-refreshToken');
-    
+
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
