@@ -123,6 +123,10 @@ async function uploadToB2(buffer, fileName, contentType) {
       fileName,
       data: buffer,
       mime: contentType,
+      // ⚡ CACHE OPTIMIZATION: Aggressive caching for CDN
+      info: {
+        'Cache-Control': 'public, max-age=31536000, immutable'
+      }
     });
 
     const fileUrl = `${CDN_URL}/${fileName}`;

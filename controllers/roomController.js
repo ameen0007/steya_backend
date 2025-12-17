@@ -38,7 +38,7 @@ async function ensureB2Authorized() {
 // ⚡ GET FRESH UPLOAD URL (for each parallel upload)
 async function getUploadUrl() {
   await ensureB2Authorized();
-  
+
   const uploadUrlResponse = await b2.getUploadUrl({
     bucketId: BUCKET_ID,
   });
@@ -59,6 +59,10 @@ async function uploadToB2(buffer, fileName, contentType = "image/jpeg") {
     fileName: fileName,
     data: buffer,
     mime: contentType,
+    // ⚡ CACHE OPTIMIZATION: Aggressive caching for CDN
+    info: {
+      'Cache-Control': 'public, max-age=31536000, immutable'
+    }
   });
 
   return `${CDN_URL}/${fileName}`;
@@ -79,7 +83,7 @@ async function deleteFromB2(fileUrl) {
 
     const fileName = fileUrl.replace(`${CDN_URL}/`, '').split('?')[0];
     await ensureB2Authorized();
-    
+
     const fileList = await b2.listFileNames({
       bucketId: BUCKET_ID,
       maxFileCount: 1,
@@ -99,7 +103,7 @@ async function deleteFromB2(fileUrl) {
 // 🗑️ Batch delete helper
 async function safelyDeleteImagesFromB2(imagesToDelete, roomId) {
   console.log(`🗑️ Deleting ${imagesToDelete.length} images for room ${roomId}`);
-  
+
   // ⚡ DELETE IN PARALLEL
   await Promise.all(
     imagesToDelete.map(img => img.originalUrl ? deleteFromB2(img.originalUrl) : Promise.resolve())
@@ -109,8 +113,8 @@ async function safelyDeleteImagesFromB2(imagesToDelete, roomId) {
 // ⚡ OPTIMIZED: Process single image (NO WATERMARK)
 async function processImage(fileBuffer, timestamp, index) {
   const mainBuffer = await sharp(fileBuffer)
-    .resize({ 
-      width: 1280, 
+    .resize({
+      width: 1280,
       withoutEnlargement: true,
       fit: 'inside'
     })
@@ -126,8 +130,8 @@ async function processImage(fileBuffer, timestamp, index) {
 // ⚡ OPTIMIZED: Process thumbnail (ONLY for first image)
 async function processThumbnail(fileBuffer, timestamp) {
   const thumbBuffer = await sharp(fileBuffer)
-    .resize({ 
-      width: 800, 
+    .resize({
+      width: 800,
       withoutEnlargement: true,
       fit: 'inside'
     })
@@ -144,7 +148,7 @@ async function processThumbnail(fileBuffer, timestamp) {
 export const uploadRooms = async (req, res) => {
   try {
     const timestamp = Date.now();
-    
+
     // 1️⃣ Collect files
     let allFiles = [];
     if (req.files) {
@@ -176,7 +180,7 @@ export const uploadRooms = async (req, res) => {
     });
 
     // ⚡ 3️⃣ PROCESS THUMBNAIL (only first image)
-    const thumbnailPromise = allFiles[0]?.buffer 
+    const thumbnailPromise = allFiles[0]?.buffer
       ? processThumbnail(allFiles[0].buffer, timestamp)
       : null;
 
@@ -209,8 +213,8 @@ export const uploadRooms = async (req, res) => {
         let locationValue = Array.isArray(req.body.location)
           ? req.body.location[req.body.location.length - 1]
           : req.body.location;
-        parsedLocation = typeof locationValue === "string" 
-          ? JSON.parse(locationValue) 
+        parsedLocation = typeof locationValue === "string"
+          ? JSON.parse(locationValue)
           : locationValue;
       } catch {
         parsedLocation = null;
@@ -221,13 +225,13 @@ export const uploadRooms = async (req, res) => {
     const parseJSON = (field) => {
       if (!req.body[field]) return undefined;
       try {
-        let value = Array.isArray(req.body[field]) 
-          ? req.body[field][req.body[field].length - 1] 
+        let value = Array.isArray(req.body[field])
+          ? req.body[field][req.body[field].length - 1]
           : req.body[field];
         return JSON.parse(value);
       } catch {
-        return Array.isArray(req.body[field]) 
-          ? req.body[field][req.body[field].length - 1] 
+        return Array.isArray(req.body[field])
+          ? req.body[field][req.body[field].length - 1]
           : req.body[field];
       }
     };
@@ -247,7 +251,7 @@ export const uploadRooms = async (req, res) => {
       title: getValue("title") || "",
       description: getValue("description") || "",
       images,
-      thumbnail, 
+      thumbnail,
       location: parsedLocation || null,
       contactPhone: getValue("contactPhone") || "",
       showPhonePublic: getValue("showPhonePublic") === "true",
@@ -309,24 +313,24 @@ export const updateRoom = async (req, res) => {
 
     console.log(`🔄 UPDATE ROOM: User ${userId} → Room ${roomId}`);
 
-    const existingRoom = await Room.findOne({ 
-      _id: roomId, 
-      createdBy: userId 
+    const existingRoom = await Room.findOne({
+      _id: roomId,
+      createdBy: userId
     });
 
     if (!existingRoom) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Room not found or unauthorized' 
+      return res.status(404).json({
+        success: false,
+        message: 'Room not found or unauthorized'
       });
     }
 
-    const existingImagesToKeep = req.body.existingImages 
-      ? JSON.parse(req.body.existingImages) 
+    const existingImagesToKeep = req.body.existingImages
+      ? JSON.parse(req.body.existingImages)
       : [];
-    
-    const imageFiles = req.files && req.files.images 
-      ? (Array.isArray(req.files.images) ? req.files.images : [req.files.images]) 
+
+    const imageFiles = req.files && req.files.images
+      ? (Array.isArray(req.files.images) ? req.files.images : [req.files.images])
       : [];
 
     console.log('📸 Image Update:', {
@@ -336,13 +340,13 @@ export const updateRoom = async (req, res) => {
     });
 
     // ⚡ DELETE OLD IMAGES IN PARALLEL (background)
-    const imagesToDelete = existingRoom.images.filter(existingImg => 
+    const imagesToDelete = existingRoom.images.filter(existingImg =>
       !existingImagesToKeep.includes(existingImg.originalUrl)
     );
 
     if (imagesToDelete.length > 0) {
       console.log('🗑️ Deleting:', imagesToDelete.length);
-      safelyDeleteImagesFromB2(imagesToDelete, roomId).catch(err => 
+      safelyDeleteImagesFromB2(imagesToDelete, roomId).catch(err =>
         console.error('Background delete error:', err)
       );
     }
@@ -375,9 +379,9 @@ export const updateRoom = async (req, res) => {
       const newImages = newImageUrls
         .filter(url => url !== null)
         .map(url => ({ originalUrl: url }));
-      
+
       images = [...images, ...newImages];
-      
+
       if (newThumbnailUrl) {
         thumbnail = { url: newThumbnailUrl };
       }
@@ -387,10 +391,10 @@ export const updateRoom = async (req, res) => {
 
     // Handle separate thumbnail upload
     if (req.files && req.files.thumbnail && !thumbnail) {
-      const thumbFile = Array.isArray(req.files.thumbnail) 
-        ? req.files.thumbnail[0] 
+      const thumbFile = Array.isArray(req.files.thumbnail)
+        ? req.files.thumbnail[0]
         : req.files.thumbnail;
-      
+
       const thumbnailUrl = await processThumbnail(thumbFile.buffer, timestamp);
       thumbnail = { url: thumbnailUrl };
     }
@@ -404,13 +408,13 @@ export const updateRoom = async (req, res) => {
     const parseJSON = (field) => {
       if (!req.body[field]) return undefined;
       try {
-        let value = Array.isArray(req.body[field]) 
-          ? req.body[field][req.body[field].length - 1] 
+        let value = Array.isArray(req.body[field])
+          ? req.body[field][req.body[field].length - 1]
           : req.body[field];
         return JSON.parse(value);
       } catch {
-        return Array.isArray(req.body[field]) 
-          ? req.body[field][req.body[field].length - 1] 
+        return Array.isArray(req.body[field])
+          ? req.body[field][req.body[field].length - 1]
           : req.body[field];
       }
     };
@@ -426,8 +430,8 @@ export const updateRoom = async (req, res) => {
         let locationValue = Array.isArray(req.body.location)
           ? req.body.location[req.body.location.length - 1]
           : req.body.location;
-        parsedLocation = typeof locationValue === "string" 
-          ? JSON.parse(locationValue) 
+        parsedLocation = typeof locationValue === "string"
+          ? JSON.parse(locationValue)
           : locationValue;
       } catch (error) {
         console.log('Location parse error, keeping existing');
@@ -507,11 +511,11 @@ export const updateRoom = async (req, res) => {
 // Keep filter functions unchanged
 function buildFilterQuery(filterData, category) {
   const query = {};
-  
+
   Object.keys(filterData).forEach(key => {
     const filter = filterData[key];
     if (!filter.selected) return;
-    
+
     let filterQuery = null;
 
     if (category === 'shared') {
@@ -526,7 +530,7 @@ function buildFilterQuery(filterData, category) {
       query[key] = filterQuery;
     }
   });
-  
+
   return query;
 }
 
@@ -534,9 +538,9 @@ function buildSharedFilter(key, filter) {
   switch (key) {
     case 'monthlyRent':
     case 'roommatesWanted':
-      return { 
-        $gte: filter.currentMin || filter.min, 
-        $lte: filter.currentMax || filter.max 
+      return {
+        $gte: filter.currentMin || filter.min,
+        $lte: filter.currentMax || filter.max
       };
     case 'genderPreference':
     case 'habitPreferences':
@@ -562,7 +566,7 @@ function buildPgFilter(key, filter) {
         'priceRange.min': { $lte: filter.currentMax || filter.max },
         'priceRange.max': { $gte: filter.currentMin || filter.min }
       };
-      
+
     case 'pgGenderCategory':
     case 'roomTypesAvailable':
     case 'mealsProvided':
@@ -587,9 +591,9 @@ function buildRentalFilter(key, filter) {
     case 'squareFeet':
     case 'bedrooms':
     case 'bathrooms':
-      return { 
-        $gte: filter.currentMin || filter.min, 
-        $lte: filter.currentMax || filter.max 
+      return {
+        $gte: filter.currentMin || filter.min,
+        $lte: filter.currentMax || filter.max
       };
     case 'propertyType':
     case 'furnishedStatus':
@@ -611,20 +615,20 @@ function buildRentalFilter(key, filter) {
 // controllers/roomController.js
 export const getRooms = async (req, res) => {
   try {
-    const { 
-      category, 
-      lat, 
-      lng, 
-      limit = 15, 
+    const {
+      category,
+      lat,
+      lng,
+      limit = 15,
       skip = 0,
-      filters 
+      filters
     } = req.query;
 
     // Validate required params
     if (!lat || !lng) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Location coordinates required" 
+      return res.status(400).json({
+        success: false,
+        message: "Location coordinates required"
       });
     }
 
@@ -633,9 +637,9 @@ export const getRooms = async (req, res) => {
 
     // Validate coordinates
     if (isNaN(latNum) || isNaN(lngNum)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid coordinates" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid coordinates"
       });
     }
 
@@ -651,14 +655,14 @@ export const getRooms = async (req, res) => {
       ],
       // Exclude blocked rooms  
       $and: [
-        { 
+        {
           $or: [
             { isBlocked: { $exists: false } },
             { isBlocked: false }
           ]
         },
         // Only active rooms
-        { 
+        {
           $or: [
             { isActive: { $exists: false } },
             { isActive: true }
@@ -685,7 +689,7 @@ export const getRooms = async (req, res) => {
       try {
         const filterData = JSON.parse(filters);
         const filterQuery = buildFilterQuery(filterData, category);
-        
+
         if (Object.keys(filterQuery).length > 0) {
           // Merge filter conditions into $and array
           if (filterQuery.$and) {
@@ -696,9 +700,9 @@ export const getRooms = async (req, res) => {
         }
       } catch (parseError) {
         console.error("Filter parsing error:", parseError);
-        return res.status(400).json({ 
-          success: false, 
-          message: "Invalid filter format" 
+        return res.status(400).json({
+          success: false,
+          message: "Invalid filter format"
         });
       }
     }
@@ -707,9 +711,9 @@ export const getRooms = async (req, res) => {
     const aggregationPipeline = [
       {
         $geoNear: {
-          near: { 
-            type: "Point", 
-            coordinates: [lngNum, latNum] 
+          near: {
+            type: "Point",
+            coordinates: [lngNum, latNum]
           },
           distanceField: "distance",
           spherical: true,
@@ -718,11 +722,11 @@ export const getRooms = async (req, res) => {
           maxDistance: 45000, // 45km radius
         }
       },
-      { 
-        $sort: { 
+      {
+        $sort: {
           distance: 1,
-          createdAt: -1 
-        } 
+          createdAt: -1
+        }
       },
       { $skip: skipNum },
       { $limit: limitNum },
@@ -738,17 +742,17 @@ export const getRooms = async (req, res) => {
           location: 1,
           distance: 1,
           createdAt: 1,
-          
+
           // Financial
           monthlyRent: 1,
           priceRange: 1,
           securityDeposit: 1,
-          
+
           // Shared Room fields
           roommatesWanted: 1,
           genderPreference: 1,
           habitPreferences: 1,
-          
+
           // PG/Hostel fields
           availableSpace: 1,
           pgGenderCategory: 1,
@@ -756,7 +760,7 @@ export const getRooms = async (req, res) => {
           mealsProvided: 1,
           amenities: 1,
           rules: 1,
-          
+
           // Flat/Home fields
           propertyType: 1,
           furnishedStatus: 1,
@@ -768,12 +772,12 @@ export const getRooms = async (req, res) => {
           totalFloors: 1,
           tenantPreference: 1,
           parking: 1,
-          
+
           // Engagement
           views: 1,
           likes: 1,
           favorites: 1,
-          
+
           // Owner info
           createdBy: 1
         }
@@ -781,16 +785,16 @@ export const getRooms = async (req, res) => {
     ];
 
     console.log('🔍 Query:', JSON.stringify({ category, skipNum, limitNum }));
-    
+
     const rooms = await Room.aggregate(aggregationPipeline);
-    
+
     // Calculate distance info efficiently
     const roomsWithDistance = rooms.map(room => {
       const straightLineKm = room.distance;
       const roadDistanceKm = straightLineKm * 1.4; // Approximate
-      
+
       let distance, label;
-      
+
       if (roadDistanceKm < 1) {
         distance = Math.round(roadDistanceKm * 1000);
         label = `${distance} m`;
@@ -798,19 +802,19 @@ export const getRooms = async (req, res) => {
         distance = Math.round(roadDistanceKm * 10) / 10; // 1 decimal
         label = `${distance} km`;
       }
-      
+
       return {
         ...room,
-        approximateRoadDistance: roadDistanceKm < 1 
-          ? Math.round(roadDistanceKm * 1000) 
+        approximateRoadDistance: roadDistanceKm < 1
+          ? Math.round(roadDistanceKm * 1000)
           : Math.round(roadDistanceKm),
         individualDistance: label,
         distanceLabel: `${label} away`
       };
     });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       rooms: roomsWithDistance,
       count: rooms.length,
       hasMore: rooms.length === limitNum,
@@ -823,8 +827,8 @@ export const getRooms = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Get Rooms Error:", err);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Failed to fetch rooms",
       error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
@@ -837,17 +841,17 @@ export const getRooms = async (req, res) => {
 // GET /api/rooms/:id
 export const getRoomById = async (req, res) => {
   console.log("inside single room controller");
-  
+
   try {
     const { id } = req.params;
     const room = await Room.findById(id).populate("createdBy", "name picture");
 
-   
+
     if (!room) {
       return res.status(404).json({ success: false, message: "Room not found" });
     }
-    console.log(room,"roomdata");
-    
+    console.log(room, "roomdata");
+
     res.json({ success: true, room });
   } catch (err) {
     console.error("Get Room Error:", err);
@@ -858,11 +862,11 @@ export const getRoomById = async (req, res) => {
 
 export const incrementRoomView = async (req, res) => {
   console.log("Increment Room View Controller Hit");
-  
+
   try {
     const { roomId } = req.params; // roomId from URL params
     const { userId } = req.body;   // userId from request body
-   
+
     const room = await Room.findById(roomId);
 
     if (!room) {
@@ -902,26 +906,26 @@ export const addFavorite = async (req, res) => {
 
     // Validation
     if (!roomId) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Room ID is required' 
+        message: 'Room ID is required'
       });
     }
 
     // Check if room exists
     const room = await Room.findById(roomId);
     if (!room) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Room not found' 
+        message: 'Room not found'
       });
     }
 
     // Check if already favorited
     if (room.favorites.includes(userId)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Room already in favorites' 
+        message: 'Room already in favorites'
       });
     }
 
@@ -940,10 +944,10 @@ export const addFavorite = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error adding favorite:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Failed to add favorite', 
-      error: error.message 
+      message: 'Failed to add favorite',
+      error: error.message
     });
   }
 };
@@ -958,25 +962,25 @@ export const removeFavorite = async (req, res) => {
 
     // Validation
     if (!roomId) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Room ID is required' 
+        message: 'Room ID is required'
       });
     }
 
     const room = await Room.findById(roomId);
     if (!room) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Room not found' 
+        message: 'Room not found'
       });
     }
 
     // Check if actually favorited
     if (!room.favorites.includes(userId)) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Room not in favorites' 
+        message: 'Room not in favorites'
       });
     }
 
@@ -995,10 +999,10 @@ export const removeFavorite = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error removing favorite:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Failed to remove favorite', 
-      error: error.message 
+      message: 'Failed to remove favorite',
+      error: error.message
     });
   }
 };
@@ -1012,18 +1016,18 @@ export const toggleFavorite = async (req, res) => {
     console.log(`🔄 TOGGLE FAVORITE: User ${userId} → Room ${roomId}`);
 
     if (!roomId) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Room ID is required' 
+        message: 'Room ID is required'
       });
     }
 
     // Check if room exists
     const room = await Room.findById(roomId);
     if (!room) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Room not found' 
+        message: 'Room not found'
       });
     }
 
@@ -1053,10 +1057,10 @@ export const toggleFavorite = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error toggling favorite:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Failed to toggle favorite', 
-      error: error.message 
+      message: 'Failed to toggle favorite',
+      error: error.message
     });
   }
 };
@@ -1072,20 +1076,20 @@ export const getMyFavorites = async (req, res) => {
     console.log(`📚 GET FAVORITES: User ${userId} - Page ${page}`);
 
     // Find rooms where user ID is in favorites array
-    const favoriteRooms = await Room.find({ 
+    const favoriteRooms = await Room.find({
       favorites: userId,
       isActive: true,
-      isBlocked: false 
+      isBlocked: false
     })
       .populate('createdBy', 'name picture')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const total = await Room.countDocuments({ 
+    const total = await Room.countDocuments({
       favorites: userId,
       isActive: true,
-      isBlocked: false 
+      isBlocked: false
     });
 
     console.log(`✅ FAVORITES FETCHED: ${favoriteRooms.length} rooms`);
@@ -1103,10 +1107,10 @@ export const getMyFavorites = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error fetching favorites:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Failed to fetch favorites', 
-      error: error.message 
+      message: 'Failed to fetch favorites',
+      error: error.message
     });
   }
 };
@@ -1114,7 +1118,7 @@ export const getMyFavorites = async (req, res) => {
 // ✅ CHECK IF ROOM IS FAVORITED
 export const checkFavorite = async (req, res) => {
   console.log("fghjjjjjjjjjjjjj--------");
-  
+
 
   try {
     const { roomId } = req.params;
@@ -1138,10 +1142,10 @@ export const checkFavorite = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error checking favorite:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Failed to check favorite status', 
-      error: error.message 
+      message: 'Failed to check favorite status',
+      error: error.message
     });
   }
 };
@@ -1153,9 +1157,9 @@ export const getFavoriteCount = async (req, res) => {
 
     const room = await Room.findById(roomId);
     if (!room) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Room not found' 
+        message: 'Room not found'
       });
     }
 
@@ -1169,10 +1173,10 @@ export const getFavoriteCount = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error counting favorites:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Failed to get favorite count', 
-      error: error.message 
+      message: 'Failed to get favorite count',
+      error: error.message
     });
   }
 };
