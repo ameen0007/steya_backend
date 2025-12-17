@@ -63,17 +63,17 @@ const broadcastOnlineStatus = async (roomId, excludedSocketId = null) => {
       onlineStatuses[participantId] = onlineUsers.has(participantId);
     }
 
-    console.log(`📢 Broadcasting online status for room ${roomIdStr}:`, onlineStatuses);
-    
+    // console.log(`📢 Broadcasting online status for room ${roomIdStr}:`, onlineStatuses);
+
     if (excludedSocketId) {
-      io.to(roomIdStr).except(excludedSocketId).emit('onlineStatuses', { 
-        roomId: roomIdStr, 
-        statuses: onlineStatuses 
+      io.to(roomIdStr).except(excludedSocketId).emit('onlineStatuses', {
+        roomId: roomIdStr,
+        statuses: onlineStatuses
       });
     } else {
-      io.to(roomIdStr).emit('onlineStatuses', { 
-        roomId: roomIdStr, 
-        statuses: onlineStatuses 
+      io.to(roomIdStr).emit('onlineStatuses', {
+        roomId: roomIdStr,
+        statuses: onlineStatuses
       });
     }
   } catch (error) {
@@ -86,11 +86,11 @@ const notifyParticipantsOfChatUpdate = async (roomId, excludedUserId = null) => 
     const room = await ChatRoom.findById(roomId).populate('participants', '_id');
     if (!room) return;
 
-    console.log(`📢 Notifying participants of chat list update for room ${roomId}`);
+    // console.log(`📢 Notifying participants of chat list update for room ${roomId}`);
 
     room.participants.forEach(participant => {
       const participantId = participant._id.toString();
-      
+
       if (excludedUserId && participantId === excludedUserId.toString()) {
         return;
       }
@@ -106,48 +106,48 @@ const notifyParticipantsOfChatUpdate = async (roomId, excludedUserId = null) => 
 };
 
 io.use((socket, next) => {
-  console.log(`🔄 Incoming connection from:`, socket.handshake.address);
+  // console.log(`🔄 Incoming connection from:`, socket.handshake.address);
   next();
 });
 
 io.on('connection', (socket) => {
-  console.log('✅ User connected', socket.id, 'at', new Date().toISOString());
+  // console.log('✅ User connected', socket.id, 'at', new Date().toISOString());
 
   socket.on('userOnline', ({ userId }) => {
     if (!userId) return;
-    
+
     const userIdStr = userId.toString();
     onlineUsers.set(userIdStr, socket.id);
     userSockets.set(socket.id, userIdStr);
-    
-    console.log(`👤 User ${userIdStr} app is online (socket: ${socket.id})`);
+
+    // console.log(`👤 User ${userIdStr} app is online (socket: ${socket.id})`);
   });
 
   socket.on('joinUserRoom', ({ userId }) => {
     if (!userId) return;
-    
+
     const userIdStr = userId.toString();
     const userRoomId = `user_${userIdStr}`;
-    
+
     socket.join(userRoomId);
     userSockets.set(socket.id, userIdStr);
     onlineUsers.set(userIdStr, socket.id);
-    
-    console.log(`👤 User ${userIdStr} joined personal room: ${userRoomId}`);
+
+    // console.log(`👤 User ${userIdStr} joined personal room: ${userRoomId}`);
   });
 
   socket.on('leaveUserRoom', ({ userId }) => {
     if (!userId) return;
-    
+
     const userIdStr = userId.toString();
     const userRoomId = `user_${userIdStr}`;
-    
+
     socket.leave(userRoomId);
-    console.log(`👤 User ${userIdStr} left personal room: ${userRoomId}`);
+    // console.log(`👤 User ${userIdStr} left personal room: ${userRoomId}`);
   });
 
   socket.on('joinRoom', async ({ roomId, userId }) => {
-    console.log(`🎯 JOIN ROOM: User ${userId} → Room ${roomId}`);
+    // console.log(`🎯 JOIN ROOM: User ${userId} → Room ${roomId}`);
 
     if (!roomId || !userId) {
       socket.emit('error', { message: 'Missing roomId or userId' });
@@ -181,8 +181,8 @@ io.on('connection', (socket) => {
         return;
       }
 
-      const userRole = chatRoom.participants[0]._id.toString() === userIdStr 
-        ? 'inquirer' 
+      const userRole = chatRoom.participants[0]._id.toString() === userIdStr
+        ? 'inquirer'
         : 'owner';
 
       let currentState = 'START';
@@ -207,8 +207,8 @@ io.on('connection', (socket) => {
             status: msg.status || 'sent',
             fromMe: msg.sender?.toString() === userIdStr
           }));
-          
-          console.log('📤 Sending messages with IDs:', 
+
+          console.log('📤 Sending messages with IDs:',
             messages.map(m => ({ id: m._id, status: m.status }))
           );
         }
@@ -239,7 +239,7 @@ io.on('connection', (socket) => {
           .lean()
           .then(property => {
             if (property?.contactPhone) {
-              console.log(`📞 Sending owner phone: ${property.contactPhone}`);
+              // console.log(`📞 Sending owner phone: ${property.contactPhone}`);
               socket.emit('ownerPhoneUpdate', { ownerPhone: property.contactPhone });
             }
           })
@@ -256,7 +256,7 @@ io.on('connection', (socket) => {
         broadcastOnlineStatus(roomIdStr, socket.id);
       }, 100);
 
-      console.log(`📢 User ${userIdStr} joined room ${roomIdStr}`);
+      // console.log(`📢 User ${userIdStr} joined room ${roomIdStr}`);
 
     } catch (error) {
       console.error('❌ Error joining room:', error);
@@ -265,14 +265,14 @@ io.on('connection', (socket) => {
   });
 
   // ✅ SIMPLE SENDMESSAGE - NO AUTO-DELIVERY
-  socket.on('sendMessage', async ({ 
-    roomId, 
-    sender, 
-    optionId, 
-    optionText, 
+  socket.on('sendMessage', async ({
+    roomId,
+    sender,
+    optionId,
+    optionText,
     text,
     messageType = 'option',
-    nextState, 
+    nextState,
     senderRole,
     tempId
   }) => {
@@ -294,7 +294,7 @@ io.on('connection', (socket) => {
       const now = Date.now();
       const userMessages = userMessageCounts.get(sender.toString()) || [];
       const recentMessages = userMessages.filter(time => now - time < 60000);
-      
+
       if (recentMessages.length >= MESSAGE_RATE_LIMIT) {
         socket.emit('error', { message: 'Message rate limit exceeded. Please wait a moment.' });
         return;
@@ -322,7 +322,7 @@ io.on('connection', (socket) => {
       }
 
       const senderUser = await User.findById(sender).select('name picture');
-      
+
       const room = await ChatRoom.findById(roomId).populate('participants', '_id name expoPushToken notificationSettings');
       if (room) {
         const updateData = {
@@ -345,8 +345,8 @@ io.on('connection', (socket) => {
 
       let chat = await Chat.findOne({ roomId });
       if (!chat) {
-        chat = new Chat({ 
-          roomId, 
+        chat = new Chat({
+          roomId,
           messages: [],
           conversationMode: 'hybrid',
           currentState: nextState || 'START'
@@ -382,7 +382,7 @@ io.on('connection', (socket) => {
       userMessageCounts.set(sender.toString(), recentMessages);
 
       const savedMessage = chat.messages[chat.messages.length - 1];
-  
+
       const broadcastData = {
         message: {
           _id: savedMessage._id.toString(),
@@ -402,7 +402,7 @@ io.on('connection', (socket) => {
 
       // ✅ Broadcast to all in room
       io.in(roomId).emit('newMessage', broadcastData);
-  
+
       // ❌ NO AUTO-DELIVERY LOGIC - REMOVED COMPLETELY
 
       await notifyParticipantsOfChatUpdate(roomId, sender);
@@ -413,11 +413,11 @@ io.on('connection', (socket) => {
           const updatedRoom = await ChatRoom.findById(roomId).populate('participants');
           if (updatedRoom) {
             const participantsUnreadStatus = {};
-            
+
             updatedRoom.participants.forEach(participant => {
-              const isUnread = updatedRoom.lastMessageSender && 
-                              updatedRoom.lastMessageSender.toString() !== participant._id.toString() && 
-                              !updatedRoom.readBy.includes(participant._id);
+              const isUnread = updatedRoom.lastMessageSender &&
+                updatedRoom.lastMessageSender.toString() !== participant._id.toString() &&
+                !updatedRoom.readBy.includes(participant._id);
               participantsUnreadStatus[participant._id.toString()] = isUnread;
             });
 
@@ -434,10 +434,10 @@ io.on('connection', (socket) => {
                 status: 'active',
                 hasMessages: true
               });
-              
-              const unreadCount = userRooms.filter(room => 
-                room.lastMessageSender && 
-                room.lastMessageSender.toString() !== participant._id.toString() && 
+
+              const unreadCount = userRooms.filter(room =>
+                room.lastMessageSender &&
+                room.lastMessageSender.toString() !== participant._id.toString() &&
                 !room.readBy.includes(participant._id)
               ).length;
 
@@ -452,7 +452,7 @@ io.on('connection', (socket) => {
           if (room && room.participants) {
             for (const participant of room.participants) {
               if (participant._id.toString() === sender.toString()) continue;
-              
+
               const recipientSocketId = onlineUsers.get(participant._id.toString());
               const isRecipientInRoom = recipientSocketId && io.sockets.adapter.rooms.get(roomId)?.has(recipientSocketId);
 
@@ -463,11 +463,11 @@ io.on('connection', (socket) => {
                 if (notifEnabled && chatNotifEnabled) {
                   try {
                     const messageContent = messageType === 'freetext' ? text : optionText;
-                    
+
                     await sendPushNotification(participant.expoPushToken, {
                       senderName: senderUser ? `${senderUser.name}` : 'New Message',
-                      message: messageContent.length > 100 
-                        ? messageContent.substring(0, 100) + '...' 
+                      message: messageContent.length > 100
+                        ? messageContent.substring(0, 100) + '...'
                         : messageContent,
                       senderAvatar: senderUser?.picture,
                       chatId: roomId.toString(),
@@ -506,10 +506,10 @@ io.on('connection', (socket) => {
   // ✅ MARK AS SEEN (replaces markAsRead)
   socket.on('markAsRead', async (data) => {
     try {
-      console.log('👁️ markAsSeen received:', data);
-      
+      // console.log('👁️ markAsSeen received:', data);
+
       let roomId, userId;
-      
+
       if (typeof data === 'string') {
         roomId = data;
         userId = socket.userId;
@@ -517,9 +517,9 @@ io.on('connection', (socket) => {
         roomId = data.roomId;
         userId = data.userId;
       }
-      
+
       if (!roomId || !userId) {
-        console.log('❌ markAsSeen: Missing roomId or userId');
+        // console.log('❌ markAsSeen: Missing roomId or userId');
         return;
       }
 
@@ -535,21 +535,21 @@ io.on('connection', (socket) => {
       const chat = await Chat.findOne({ roomId });
       if (chat) {
         let updatedMessageIds = [];
-        
+
         // ✅ Mark OTHER user's messages as SEEN
         chat.messages.forEach(msg => {
           const isOtherUserMessage = msg.sender.toString() !== userId;
           const isSent = msg.status === 'sent'; // Only mark 'sent' → 'seen'
-          
+
           if (isOtherUserMessage && isSent) {
             msg.status = 'seen'; // ✅ Change to SEEN
             updatedMessageIds.push(msg._id.toString());
           }
         });
-        
+
         if (updatedMessageIds.length > 0) {
           await chat.save();
-          
+
           // ✅ Broadcast to ALL participants
           io.to(roomId).emit('messagesMarkedAsSeen', {
             roomId,
@@ -557,8 +557,8 @@ io.on('connection', (socket) => {
             seenBy: userId,
             timestamp: new Date()
           });
-          
-          console.log(`✅ Marked ${updatedMessageIds.length} messages as SEEN by ${userId}`);
+
+          // console.log(`✅ Marked ${updatedMessageIds.length} messages as SEEN by ${userId}`);
         }
       }
 
@@ -576,7 +576,7 @@ io.on('connection', (socket) => {
 
       const roomIdStr = roomId.toString();
       const userIdStr = userId.toString();
-      
+
       const room = await ChatRoom.findById(roomIdStr).populate('participants', '_id');
       if (!room) {
         console.warn(`⚠️ Room ${roomIdStr} not found`);
@@ -589,7 +589,7 @@ io.on('connection', (socket) => {
         onlineStatuses[participantId] = onlineUsers.has(participantId);
       }
 
-      console.log(`📊 Sending online statuses for room ${roomIdStr}:`, onlineStatuses);
+      // console.log(`📊 Sending online statuses for room ${roomIdStr}:`, onlineStatuses);
       socket.emit('onlineStatuses', { roomId: roomIdStr, statuses: onlineStatuses });
     } catch (error) {
       console.error('❌ Error getting online status:', error);
@@ -606,7 +606,7 @@ io.on('connection', (socket) => {
 
     try {
       if (!roomId || !messageIdentifier || !userId) {
-        console.log('❌ Missing fields:', { roomId, messageIdentifier, userId });
+        // console.log('❌ Missing fields:', { roomId, messageIdentifier, userId });
         socket.emit('error', { message: 'Missing required fields for deletion' });
         return;
       }
@@ -624,7 +624,7 @@ io.on('connection', (socket) => {
         const msgDate = msg.createdAt instanceof Date ? msg.createdAt : new Date(msg.createdAt);
         const dateMatch = Math.abs(targetDate.getTime() - msgDate.getTime()) < 1000;
         const typeMatch = msg.messageType === messageIdentifier.messageType;
-        const textMatch = msg.messageType === 'freetext' 
+        const textMatch = msg.messageType === 'freetext'
           ? msg.text === messageIdentifier.text
           : msg.option === messageIdentifier.text;
 
@@ -632,7 +632,7 @@ io.on('connection', (socket) => {
       });
 
       if (messageIndex === -1) {
-        console.log('❌ Message not found');
+        // console.log('❌ Message not found');
         socket.emit('error', { message: 'Message not found' });
         return;
       }
@@ -649,15 +649,15 @@ io.on('connection', (socket) => {
       chat.messages.pull(message._id);
       await chat.save();
 
-      console.log(`✅ Message deleted successfully. Index: ${messageIndex}`);
+      // console.log(`✅ Message deleted successfully. Index: ${messageIndex}`);
 
       const room = await ChatRoom.findById(roomId);
       if (room) {
         const lastMessage = chat.messages[chat.messages.length - 1];
         if (lastMessage) {
           const updateData = {
-            lastMessage: lastMessage.messageType === 'freetext' 
-              ? lastMessage.text 
+            lastMessage: lastMessage.messageType === 'freetext'
+              ? lastMessage.text
               : lastMessage.option,
             updatedAt: new Date()
           };
@@ -681,9 +681,9 @@ io.on('connection', (socket) => {
 
     } catch (error) {
       console.error('❌ Error deleting message:', error);
-      socket.emit('error', { 
+      socket.emit('error', {
         message: 'Failed to delete message',
-        error: error.message 
+        error: error.message
       });
     }
   });
@@ -696,7 +696,7 @@ io.on('connection', (socket) => {
         if (message) {
           message.status = status;
           await chat.save();
-          
+
           socket.to(roomId).emit('messageStatusUpdate', {
             messageId,
             status,
@@ -717,7 +717,7 @@ io.on('connection', (socket) => {
     if (userId) {
       const userIdStr = userId.toString();
       const roomIdStr = roomId.toString();
-      
+
       if (userRooms.has(userIdStr)) {
         userRooms.get(userIdStr).delete(roomIdStr);
         if (userRooms.get(userIdStr).size === 0) {
@@ -729,15 +729,15 @@ io.on('connection', (socket) => {
         broadcastOnlineStatus(roomIdStr);
       }, 100);
     }
-    
+
     socket.leave(roomId);
   });
 
   socket.on('disconnect', (reason) => {
-    console.log(`❌ User disconnected: ${socket.id}, Reason: ${reason}`);
-    
+    // console.log(`❌ User disconnected: ${socket.id}, Reason: ${reason}`);
+
     const disconnectedUserId = userSockets.get(socket.id);
-    
+
     if (disconnectedUserId) {
       onlineUsers.delete(disconnectedUserId);
       userSockets.delete(socket.id);
@@ -765,7 +765,7 @@ app.get("/api/debug/connections", (req, res) => {
       rooms: Array.from(socket.rooms)
     });
   });
-  
+
   res.json({
     totalConnections: io.engine.clientsCount,
     onlineUsers: Array.from(onlineUsers.entries()),
@@ -790,7 +790,7 @@ app.get("/api/debug/rooms", (req, res) => {
       users: Array.from(sockets).map(socketId => userSockets.get(socketId)).filter(Boolean)
     };
   });
-  
+
   res.json({
     totalRooms: Object.keys(rooms).length,
     rooms
@@ -808,7 +808,7 @@ app.get("/api/debug/presence", (req, res) => {
     totalOnline: onlineUsers.size,
     totalTrackedUsers: userRooms.size
   };
-  
+
   res.json(presenceData);
 });
 

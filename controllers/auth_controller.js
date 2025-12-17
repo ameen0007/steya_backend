@@ -63,8 +63,8 @@ export const updateLocation = async (req, res) => {
 
 
     const { userId, location } = req.body;
-    console.log(userId, "userid");
-    console.log(location, "location");
+    // console.log(userId, "userid");
+    // console.log(location, "location");
 
 
     const user = await User.findByIdAndUpdate(
@@ -130,7 +130,7 @@ async function uploadToB2(buffer, fileName, contentType) {
     });
 
     const fileUrl = `${CDN_URL}/${fileName}`;
-    console.log(`✅ Uploaded: ${fileUrl}`);
+    // console.log(`✅ Uploaded: ${fileUrl}`);
     return fileUrl;
   } catch (error) {
     console.error("❌ B2 Upload Error:", error.message);
@@ -141,7 +141,7 @@ async function uploadToB2(buffer, fileName, contentType) {
 async function deleteFromB2(fileUrl) {
   try {
     if (!fileUrl || !fileUrl.includes(CDN_URL)) {
-      console.log(`⚠️ Skipping non-B2 URL: ${fileUrl}`);
+      // console.log(`⚠️ Skipping non-B2 URL: ${fileUrl}`);
       return;
     }
 
@@ -157,7 +157,7 @@ async function deleteFromB2(fileUrl) {
     if (fileList.data.files.length > 0) {
       const fileId = fileList.data.files[0].fileId;
       await b2.deleteFileVersion({ fileId, fileName });
-      console.log(`✅ Deleted old profile image: ${fileName}`);
+      // console.log(`✅ Deleted old profile image: ${fileName}`);
     }
   } catch (error) {
     console.error(`❌ Delete error:`, error.message);
@@ -222,7 +222,7 @@ export const updateProfile = async (req, res) => {
         }
 
         updateData.picture = newImageUrl;
-        console.log(`✅ Profile image uploaded: ${newImageUrl}`);
+        // console.log(`✅ Profile image uploaded: ${newImageUrl}`);
       }
     }
 

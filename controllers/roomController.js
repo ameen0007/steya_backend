@@ -345,7 +345,7 @@ export const updateRoom = async (req, res) => {
     );
 
     if (imagesToDelete.length > 0) {
-      console.log('🗑️ Deleting:', imagesToDelete.length);
+      // console.log('🗑️ Deleting:', imagesToDelete.length);
       safelyDeleteImagesFromB2(imagesToDelete, roomId).catch(err =>
         console.error('Background delete error:', err)
       );
@@ -357,7 +357,7 @@ export const updateRoom = async (req, res) => {
 
     // ⚡ PROCESS NEW IMAGES IN PARALLEL (each gets fresh upload URL)
     if (imageFiles.length > 0) {
-      console.log('📤 Processing new images:', imageFiles.length);
+      // console.log('📤 Processing new images:', imageFiles.length);
 
       const imagePromises = imageFiles.map((file, index) => {
         if (!file.buffer || file.buffer.length === 0) return null;
@@ -386,7 +386,7 @@ export const updateRoom = async (req, res) => {
         thumbnail = { url: newThumbnailUrl };
       }
 
-      console.log(`✅ ${newImages.length} new images uploaded`);
+      // console.log(`✅ ${newImages.length} new images uploaded`);
     }
 
     // Handle separate thumbnail upload
@@ -434,7 +434,7 @@ export const updateRoom = async (req, res) => {
           ? JSON.parse(locationValue)
           : locationValue;
       } catch (error) {
-        console.log('Location parse error, keeping existing');
+        // console.log('Location parse error, keeping existing');
       }
     }
 
@@ -486,7 +486,7 @@ export const updateRoom = async (req, res) => {
       { new: true, runValidators: true }
     ).populate('createdBy', 'name picture');
 
-    console.log(`✅ ROOM UPDATED: ${roomId} with ${images.length} images`);
+    // console.log(`✅ ROOM UPDATED: ${roomId} with ${images.length} images`);
 
     res.json({
       success: true,
@@ -784,7 +784,7 @@ export const getRooms = async (req, res) => {
       }
     ];
 
-    console.log('🔍 Query:', JSON.stringify({ category, skipNum, limitNum }));
+    // console.log('🔍 Query:', JSON.stringify({ category, skipNum, limitNum }));
 
     const rooms = await Room.aggregate(aggregationPipeline);
 
@@ -840,7 +840,7 @@ export const getRooms = async (req, res) => {
 
 // GET /api/rooms/:id
 export const getRoomById = async (req, res) => {
-  console.log("inside single room controller");
+  // console.log("inside single room controller");
 
   try {
     const { id } = req.params;
@@ -850,7 +850,7 @@ export const getRoomById = async (req, res) => {
     if (!room) {
       return res.status(404).json({ success: false, message: "Room not found" });
     }
-    console.log(room, "roomdata");
+    // console.log(room, "roomdata");
 
     res.json({ success: true, room });
   } catch (err) {
@@ -861,7 +861,7 @@ export const getRoomById = async (req, res) => {
 
 
 export const incrementRoomView = async (req, res) => {
-  console.log("Increment Room View Controller Hit");
+  // console.log("Increment Room View Controller Hit");
 
   try {
     const { roomId } = req.params; // roomId from URL params
@@ -902,7 +902,7 @@ export const addFavorite = async (req, res) => {
     const { roomId } = req.body;
     const userId = req.user._id;
 
-    console.log(`❤️ ADD FAVORITE: User ${userId} → Room ${roomId}`);
+    // console.log(`❤️ ADD FAVORITE: User ${userId} → Room ${roomId}`);
 
     // Validation
     if (!roomId) {
@@ -933,7 +933,7 @@ export const addFavorite = async (req, res) => {
     room.favorites.push(userId);
     await room.save();
 
-    console.log(`✅ FAVORITE ADDED to room: ${roomId}`);
+    // console.log(`✅ FAVORITE ADDED to room: ${roomId}`);
 
     res.status(201).json({
       success: true,
@@ -958,7 +958,7 @@ export const removeFavorite = async (req, res) => {
     const { roomId } = req.body;
     const userId = req.user._id;
 
-    console.log(`🗑️ REMOVE FAVORITE: User ${userId} → Room ${roomId}`);
+    // console.log(`🗑️ REMOVE FAVORITE: User ${userId} → Room ${roomId}`);
 
     // Validation
     if (!roomId) {
@@ -988,7 +988,7 @@ export const removeFavorite = async (req, res) => {
     room.favorites = room.favorites.filter(favId => !favId.equals(userId));
     await room.save();
 
-    console.log(`✅ FAVORITE REMOVED from room: ${roomId}`);
+    // console.log(`✅ FAVORITE REMOVED from room: ${roomId}`);
 
     res.json({
       success: true,
@@ -1013,7 +1013,7 @@ export const toggleFavorite = async (req, res) => {
     const { roomId } = req.body;
     const userId = req.user._id;
 
-    console.log(`🔄 TOGGLE FAVORITE: User ${userId} → Room ${roomId}`);
+    // console.log(`🔄 TOGGLE FAVORITE: User ${userId} → Room ${roomId}`);
 
     if (!roomId) {
       return res.status(400).json({
@@ -1038,12 +1038,12 @@ export const toggleFavorite = async (req, res) => {
       // Remove from favorites
       room.favorites = room.favorites.filter(favId => !favId.equals(userId));
       action = 'removed';
-      console.log(`✅ FAVORITE REMOVED: ${roomId}`);
+      // console.log(`✅ FAVORITE REMOVED: ${roomId}`);
     } else {
       // Add to favorites
       room.favorites.push(userId);
       action = 'added';
-      console.log(`✅ FAVORITE ADDED: ${roomId}`);
+      // console.log(`✅ FAVORITE ADDED: ${roomId}`);
     }
 
     await room.save();
@@ -1073,7 +1073,7 @@ export const getMyFavorites = async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    console.log(`📚 GET FAVORITES: User ${userId} - Page ${page}`);
+    // console.log(`📚 GET FAVORITES: User ${userId} - Page ${page}`);
 
     // Find rooms where user ID is in favorites array
     const favoriteRooms = await Room.find({
@@ -1092,7 +1092,7 @@ export const getMyFavorites = async (req, res) => {
       isBlocked: false
     });
 
-    console.log(`✅ FAVORITES FETCHED: ${favoriteRooms.length} rooms`);
+    // console.log(`✅ FAVORITES FETCHED: ${favoriteRooms.length} rooms`);
 
     res.json({
       success: true,
@@ -1117,14 +1117,14 @@ export const getMyFavorites = async (req, res) => {
 
 // ✅ CHECK IF ROOM IS FAVORITED
 export const checkFavorite = async (req, res) => {
-  console.log("fghjjjjjjjjjjjjj--------");
+  // console.log("fghjjjjjjjjjjjjj--------");
 
 
   try {
     const { roomId } = req.params;
     const userId = req.user._id;
 
-    console.log(`🔍 CHECK FAVORITE: User ${userId} → Room ${roomId}`);
+    // console.log(`🔍 CHECK FAVORITE: User ${userId} → Room ${roomId}`);
 
     const room = await Room.findOne({
       _id: roomId,
